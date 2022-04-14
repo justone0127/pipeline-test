@@ -1,0 +1,102 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewApp
+  labels:
+    app: nexus
+    app.kubernetes.io/part-of: nexus
+    template: nexus3-persistent-template
+  name: nexus
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    deploymentconfig: nexus
+  strategy:
+    activeDeadlineSeconds: 21600
+    recreateParams:
+      post:
+        execNewPod:
+          command:
+          - /bin/bash
+          - -c
+          - curl -o /tmp/nexus-functions -s https://raw.githubusercontent.com/OpenShiftDemos/nexus/master/scripts/nexus-functions;
+            source /tmp/nexus-functions; add_nexus3_redhat_repos admin admin123 http://nexus:8081
+          containerName: nexus
+        failurePolicy: Abort
+      timeoutSeconds: 1200
+    resources: {}
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        deploymentconfig: nexus
+    spec:
+      containers:
+      - env:
+        - name: CONTEXT_PATH
+          value: /
+        image: docker.io/sonatype/nexus3@sha256:19d186d5bc8be1ea4f7bae72756baa830e79bf20aae0e9e7b1a0c7d3ce7ac136
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - echo
+            - ok
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: nexus
+        ports:
+        - containerPort: 8081
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /nexus-data
+          name: nexus-data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: nexus-data
+        persistentVolumeClaim:
+          claimName: nexus-pv
+  test: false
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - nexus
+      from:
+        kind: ImageStreamTag
+        name: nexus:3.13.0
+        namespace: cicd-admin
+      lastTriggeredImage: docker.io/sonatype/nexus3@sha256:19d186d5bc8be1ea4f7bae72756baa830e79bf20aae0e9e7b1a0c7d3ce7ac136
+    type: ImageChange

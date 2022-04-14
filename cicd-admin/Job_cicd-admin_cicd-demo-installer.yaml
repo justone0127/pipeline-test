@@ -1,0 +1,134 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    batch.kubernetes.io/job-tracking: ""
+    openshift.io/generated-by: OpenShiftNewApp
+  labels:
+    group: cicd
+    template: cicd
+  name: cicd-demo-installer
+spec:
+  activeDeadlineSeconds: 400
+  backoffLimit: 6
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  selector:
+    matchLabels:
+      controller-uid: 5eb27cdb-b308-4413-b097-a4ea948e5b67
+  suspend: false
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        controller-uid: 5eb27cdb-b308-4413-b097-a4ea948e5b67
+        job-name: cicd-demo-installer
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -x
+        - -c
+        - "# adjust jenkins \noc set resources dc/jenkins --limits=cpu=2,memory=2Gi
+          --requests=cpu=100m,memory=512Mi \noc label dc jenkins app=jenkins --overwrite
+          \n\n# setup dev env\noc import-image wildfly --from=openshift/wildfly-120-centos7
+          --confirm -n dev-admin \n\nif [ \"true\" == \"true\" ] ; then\n  # cicd\n
+          \ oc create secret generic quay-cicd-secret --from-literal=\"username=admin\"
+          --from-literal=\"password=redhat1!\" -n ${CICD_NAMESPACE}\n  oc label secret
+          quay-cicd-secret credential.sync.jenkins.openshift.io=true -n ${CICD_NAMESPACE}\n
+          \ \n  # dev\n  oc create secret docker-registry quay-cicd-secret --docker-server=quay.io
+          --docker-username=\"admin\" --docker-password=\"redhat1!\" --docker-email=cicd@redhat.com
+          -n dev-admin\n  oc new-build --name=tasks --image-stream=wildfly:latest
+          --binary=true --push-secret=quay-cicd-secret --to-docker --to='quay.io/admin/tasks-app:latest'
+          -n dev-admin\n  oc new-app --name=tasks --docker-image=quay.io/admin/tasks-app:latest
+          --allow-missing-images --as-deployment-config -n dev-admin\n  oc set triggers
+          dc tasks --remove-all -n dev-admin\n  oc patch dc tasks -p '{\"spec\": {\"template\":
+          {\"spec\": {\"containers\": [{\"name\": \"tasks\", \"imagePullPolicy\":
+          \"Always\"}]}}}}' -n dev-admin\n  oc delete is tasks -n dev-admin\n  oc
+          secrets link default quay-cicd-secret --for=pull -n dev-admin\n  \n  # stage\n
+          \ oc create secret docker-registry quay-cicd-secret --docker-server=quay.io
+          --docker-username=\"admin\" --docker-password=\"redhat1!\" --docker-email=cicd@redhat.com
+          -n stage-admin\n  oc new-app --name=tasks --docker-image=quay.io/admin/tasks-app:stage
+          --allow-missing-images --as-deployment-config -n stage-admin\n  oc set triggers
+          dc tasks --remove-all -n stage-admin\n  oc patch dc tasks -p '{\"spec\":
+          {\"template\": {\"spec\": {\"containers\": [{\"name\": \"tasks\", \"imagePullPolicy\":
+          \"Always\"}]}}}}' -n stage-admin\n  oc delete is tasks -n stage-admin\n
+          \ oc secrets link default quay-cicd-secret --for=pull -n stage-admin\nelse\n
+          \ # dev\n  oc new-build --name=tasks --image-stream=wildfly:latest --binary=true
+          -n dev-admin\n  oc new-app tasks:latest --allow-missing-images --as-deployment-config
+          -n dev-admin\n  oc set triggers dc -l app=tasks --containers=tasks --from-image=tasks:latest
+          --manual -n dev-admin\n  \n  # stage\n  oc new-app tasks:stage --allow-missing-images
+          --as-deployment-config -n stage-admin\n  oc set triggers dc -l app=tasks
+          --containers=tasks --from-image=tasks:stage --manual -n stage-admin\nfi\n\n#
+          dev project\noc expose dc/tasks --port=8080 -n dev-admin\noc expose svc/tasks
+          -n dev-admin\noc set probe dc/tasks --readiness --get-url=http://:8080/ws/demo/healthcheck
+          --initial-delay-seconds=30 --failure-threshold=10 --period-seconds=10 -n
+          dev-admin\noc set probe dc/tasks --liveness  --get-url=http://:8080/ws/demo/healthcheck
+          --initial-delay-seconds=180 --failure-threshold=10 --period-seconds=10 -n
+          dev-admin\noc rollout cancel dc/tasks -n stage-admin\n\n# stage project\noc
+          expose dc/tasks --port=8080 -n stage-admin\noc expose svc/tasks -n stage-admin\noc
+          set probe dc/tasks --readiness --get-url=http://:8080/ws/demo/healthcheck
+          --initial-delay-seconds=30 --failure-threshold=10 --period-seconds=10 -n
+          stage-admin\noc set probe dc/tasks --liveness  --get-url=http://:8080/ws/demo/healthcheck
+          --initial-delay-seconds=180 --failure-threshold=10 --period-seconds=10 -n
+          stage-admin\noc rollout cancel dc/tasks -n dev-admin\n\n# deploy gogs\nHOSTNAME=$(oc
+          get route jenkins -o template --template='{{.spec.host}}' | sed \"s/jenkins-${CICD_NAMESPACE}.//g\")\nGOGS_HOSTNAME=\"gogs-$CICD_NAMESPACE.$HOSTNAME\"\n\nif
+          [ \"false\" == \"true\" ] ; then\n  oc new-app -f https://raw.githubusercontent.com/siamaksade/gogs/master/gogs-template-ephemeral.yaml
+          \\\n      --param=GOGS_VERSION=0.11.34 \\\n      --param=HOSTNAME=$GOGS_HOSTNAME
+          \\\n      --param=SKIP_TLS_VERIFY=true\nelse\n  oc new-app -f https://raw.githubusercontent.com/siamaksade/gogs/master/gogs-template.yaml
+          \\\n      --param=GOGS_VERSION=0.11.34 \\\n      --param=HOSTNAME=$GOGS_HOSTNAME
+          \\\n      --param=SKIP_TLS_VERIFY=true\nfi\n\nsleep 5\n\nif [ \"false\"
+          == \"true\" ] ; then\n  oc process -f https://raw.githubusercontent.com/siamaksade/sonarqube/8/sonarqube-template.yaml
+          | oc create -f -\nelse\n  oc process -f https://raw.githubusercontent.com/siamaksade/sonarqube/8/sonarqube-persistent-template.yaml
+          | oc create -f -\nfi\n\noc set resources dc/sonarqube --limits=cpu=1,memory=2.5Gi
+          --requests=cpu=200m,memory=512Mi\n\nif [ \"false\" == \"true\" ] ; then\n
+          \ oc new-app -f https://raw.githubusercontent.com/OpenShiftDemos/nexus/master/nexus3-template.yaml
+          --param=NEXUS_VERSION=3.13.0 --param=MAX_MEMORY=2Gi\nelse\n  oc new-app
+          -f https://raw.githubusercontent.com/OpenShiftDemos/nexus/master/nexus3-persistent-template.yaml
+          --param=NEXUS_VERSION=3.13.0 --param=MAX_MEMORY=2Gi\nfi\n\noc set resources
+          dc/nexus --requests=cpu=200m --limits=cpu=2\n\nGOGS_SVC=$(oc get svc gogs
+          -o template --template='{{.spec.clusterIP}}')\nGOGS_USER=gogs\nGOGS_PWD=gogs\n\noc
+          rollout status dc gogs\n\n# Even though the rollout is complete gogs isn't
+          always ready to create the admin user\nsleep 10\n\n# Try 10 times to create
+          the admin user. Fail after that.\nfor i in {1..10};\ndo\n\n  _RETURN=$(curl
+          -o /tmp/curl.log -sL --post302 -w \"%{http_code}\" http://$GOGS_SVC:3000/user/sign_up
+          \\\n    --form user_name=$GOGS_USER \\\n    --form password=$GOGS_PWD \\\n
+          \   --form retype=$GOGS_PWD \\\n    --form email=admin@gogs.com)\n\n  if
+          [ $_RETURN == \"200\" ] || [ $_RETURN == \"302\" ]\n  then\n    echo \"SUCCESS:
+          Created gogs admin user\"\n    break\n  elif [ $_RETURN != \"200\" ] &&
+          [ $_RETURN != \"302\" ] && [ $i == 10 ]; then\n    echo \"ERROR: Failed
+          to create Gogs admin\"\n    cat /tmp/curl.log\n    exit 255\n  fi\n\n  #
+          Sleep between each attempt\n  sleep 10\n\ndone\n\n\ncat <<EOF > /tmp/data.json\n{\n
+          \ \"clone_addr\": \"https://github.com/OpenShiftDemos/openshift-tasks.git\",\n
+          \ \"uid\": 1,\n  \"repo_name\": \"openshift-tasks\"\n}\nEOF\n\n_RETURN=$(curl
+          -o /tmp/curl.log -sL -w \"%{http_code}\" -H \"Content-Type: application/json\"
+          \\\n-u $GOGS_USER:$GOGS_PWD -X POST http://$GOGS_SVC:3000/api/v1/repos/migrate
+          -d @/tmp/data.json)\n\nif [ $_RETURN != \"201\" ] ;then\n  echo \"ERROR:
+          Failed to import openshift-tasks GitHub repo\"\n  cat /tmp/curl.log\n  exit
+          255\nfi\n\nsleep 5\n\ncat <<EOF > /tmp/data.json\n{\n  \"type\": \"gogs\",\n
+          \ \"config\": {\n    \"url\": \"https://openshift.default.svc.cluster.local/apis/build.openshift.io/v1/namespaces/$CICD_NAMESPACE/buildconfigs/tasks-pipeline/webhooks/wxfl5Bv0/generic\",\n
+          \   \"content_type\": \"json\"\n  },\n  \"events\": [\n    \"push\"\n  ],\n
+          \ \"active\": true\n}\nEOF\n\n_RETURN=$(curl -o /tmp/curl.log -sL -w \"%{http_code}\"
+          -H \"Content-Type: application/json\" \\\n-u $GOGS_USER:$GOGS_PWD -X POST
+          http://$GOGS_SVC:3000/api/v1/repos/gogs/openshift-tasks/hooks -d @/tmp/data.json)\n\nif
+          [ $_RETURN != \"201\" ] ; then\n  echo \"ERROR: Failed to set webhook\"\n
+          \ cat /tmp/curl.log\n  exit 255\nfi\n\noc label dc jenkins \"app.kubernetes.io/part-of\"=\"jenkins\"
+          --overwrite\noc label dc nexus \"app.kubernetes.io/part-of\"=\"nexus\" --overwrite\n"
+        env:
+        - name: CICD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        imagePullPolicy: Always
+        name: cicd-demo-installer-job
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

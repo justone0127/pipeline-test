@@ -1,0 +1,21 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 4m
+    openshift.io/generated-by: OpenShiftNewApp
+    openshift.io/host.generated: "true"
+    template.openshift.io/expose-uri: http://{.spec.host}{.spec.path}
+  labels:
+    app: jenkins-ephemeral
+    template: jenkins-ephemeral-template
+  name: jenkins
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: jenkins
+    weight: 100
+  wildcardPolicy: None

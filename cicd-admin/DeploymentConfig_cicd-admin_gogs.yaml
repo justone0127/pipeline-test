@@ -1,0 +1,103 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewApp
+  labels:
+    app: gogs
+    app.kubernetes.io/component: gogs
+    app.kubernetes.io/instance: gogs
+    app.kubernetes.io/name: gogs
+    app.kubernetes.io/part-of: gogs
+  name: gogs
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    app: gogs
+    deploymentconfig: gogs
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        app: gogs
+        deploymentconfig: gogs
+    spec:
+      containers:
+      - image: quay.io/siamaksade/gogs@sha256:8f1fe09ee402cb3beaa09373a78dca7fefe2c9a1ab167ea80af09667b99b91ff
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 10
+          httpGet:
+            path: /
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: gogs
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 10
+          httpGet:
+            path: /
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 40
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /opt/gogs/data
+          name: gogs-data
+        - mountPath: /etc/gogs/conf
+          name: gogs-config
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: gogs
+      serviceAccountName: gogs
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: gogs-data
+        persistentVolumeClaim:
+          claimName: gogs-data
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: app.ini
+            path: app.ini
+          name: gogs-config
+        name: gogs-config
+  test: false
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - gogs
+      from:
+        kind: ImageStreamTag
+        name: gogs:0.11.34
+        namespace: cicd-admin
+      lastTriggeredImage: quay.io/siamaksade/gogs@sha256:8f1fe09ee402cb3beaa09373a78dca7fefe2c9a1ab167ea80af09667b99b91ff
+    type: ImageChange

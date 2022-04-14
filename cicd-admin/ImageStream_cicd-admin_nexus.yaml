@@ -1,0 +1,23 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewApp
+    openshift.io/image.dockerRepositoryCheck: "2022-04-13T03:42:53Z"
+  labels:
+    app: nexus
+    template: nexus3-persistent-template
+  name: nexus
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: docker.io/sonatype/nexus3:3.13.0
+    generation: 2
+    importPolicy: {}
+    name: 3.13.0
+    referencePolicy:
+      type: Source
