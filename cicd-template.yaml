@@ -151,7 +151,7 @@ objects:
                     openshift.withCluster() {
                       if (env.ENABLE_QUAY.toBoolean()) {
                         withCredentials([usernamePassword(credentialsId: "${openshift.project()}-quay-cicd-secret", usernameVariable: "QUAY_USER", passwordVariable: "QUAY_PWD")]) {
-                          sh "skopeo copy docker://example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:latest docker://example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:stage --src-creds \"admin:redhat1!\" --dest-creds \"admin:redhat1!\" --src-tls-verify=false --dest-tls-verify=false"
+                          sh "skopeo copy docker://quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:latest docker://quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:stage --src-creds \"admin:redhat1!\" --dest-creds \"admin:redhat1!\" --src-tls-verify=false --dest-tls-verify=false"
                         }
                       } else {
                         openshift.tag("${env.DEV_PROJECT}/tasks:latest", "${env.STAGE_PROJECT}/tasks:stage")
