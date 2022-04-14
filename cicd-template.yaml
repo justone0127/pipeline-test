@@ -286,7 +286,7 @@ objects:
               oc label secret quay-cicd-secret credential.sync.jenkins.openshift.io=true -n ${CICD_NAMESPACE}
               
               # dev
-              oc create secret docker-registry quay-cicd-secret --docker-server=example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com --docker-username="admin" --docker-password="redhat1!" --docker-email=hyou@redhat.com -n ${DEV_PROJECT}
+              oc create secret docker-registry quay-cicd-secret --docker-server=quay.apps.cluster-6ab3.sandbox1873.opentlc.com --docker-username="admin" --docker-password="redhat1!" --docker-email=hyou@redhat.com -n ${DEV_PROJECT}
               oc new-build --name=tasks --image-stream=wildfly:latest --binary=true --push-secret=quay-cicd-secret --to-docker --to='example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin}/tasks:latest' -n ${DEV_PROJECT}
               oc new-app --name=tasks --docker-image=example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:latest --allow-missing-images --as-deployment-config -n ${DEV_PROJECT}
               oc set triggers dc tasks --remove-all -n ${DEV_PROJECT}
@@ -295,8 +295,8 @@ objects:
               oc secrets link default quay-cicd-secret --for=pull -n ${DEV_PROJECT}
               
               # stage
-              oc create secret docker-registry quay-cicd-secret --docker-server=example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com --docker-username="admin" --docker-password="redhat1!" --docker-email=hyou@redhat.com -n ${STAGE_PROJECT}
-              oc new-app --name=tasks --docker-image=example-registry-quay-quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:stage --allow-missing-images --as-deployment-config -n ${STAGE_PROJECT}
+              oc create secret docker-registry quay-cicd-secret --docker-server=quay.apps.cluster-6ab3.sandbox1873.opentlc.com --docker-username="admin" --docker-password="redhat1!" --docker-email=hyou@redhat.com -n ${STAGE_PROJECT}
+              oc new-app --name=tasks --docker-image=quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks:stage --allow-missing-images --as-deployment-config -n ${STAGE_PROJECT}
               oc set triggers dc tasks --remove-all -n ${STAGE_PROJECT}
               oc patch dc tasks -p '{"spec": {"template": {"spec": {"containers": [{"name": "tasks", "imagePullPolicy": "Always"}]}}}}' -n ${STAGE_PROJECT}
               oc delete is tasks -n ${STAGE_PROJECT}
