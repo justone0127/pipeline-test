@@ -1,0 +1,38 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewBuild
+  labels:
+    build: test-tasks
+  name: test-tasks
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    pushSecret:
+      name: quay-cicd-secret
+    to:
+      kind: DockerImage
+      name: quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/test-tasks-app:latest
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    binary: {}
+    type: Binary
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: eap74-openjdk11-openshift-rhel8:7.4.4-2
+        namespace: dev-admin
+    type: Source
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - github:
+      secret: A4xrjCpYiKBGIOTRBnVt
+    type: GitHub
+  - generic:
+      secret: rJf_gDHQDYtjjs0Czv7s
+    type: Generic

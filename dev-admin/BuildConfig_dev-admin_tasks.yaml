@@ -1,0 +1,38 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftNewBuild
+  labels:
+    build: tasks
+  name: tasks
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    pushSecret:
+      name: quay-cicd-secret
+    to:
+      kind: DockerImage
+      name: quay.apps.cluster-6ab3.sandbox1873.opentlc.com/admin/tasks-app:latest
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    binary: {}
+    type: Binary
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: wildfly:latest
+        namespace: dev-admin
+    type: Source
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - github:
+      secret: 4xm2J8nslm63LIMYmPHG
+    type: GitHub
+  - generic:
+      secret: 4UlPziBee_BCURzfSW2L
+    type: Generic
